@@ -13,7 +13,7 @@ import '../services/tmdb_service.dart';
 import '../screens/video_player_screen.dart';
 import 'watermark.dart';
 
-class MovieCard extends StatelessWidget {
+class MovieCard extends StatefulWidget {
   final TmdbMovie movie;
   final int index;
   final bool isLarge;
@@ -25,26 +25,31 @@ class MovieCard extends StatelessWidget {
     this.isLarge = false,
   });
 
+  @override
+  State<MovieCard> createState() => _MovieCardState();
+}
+
+class _MovieCardState extends State<MovieCard> {
+  double _rotateX = 0;
+  double _rotateY = 0;
+  double _scale = 1.0;
+
   void _playMovie(BuildContext context) {
     HapticFeedback.lightImpact();
     Navigator.push(
       context,
       PageRouteBuilder(
         pageBuilder: (context, animation, secondaryAnimation) => VideoPlayerScreen(
-          movieId: movie.id,
-          movieTitle: movie.title,
-          isTvShow: movie.isTvShow,
+          movieId: widget.movie.id,
+          movieTitle: widget.movie.title,
+          isTvShow: widget.movie.isTvShow,
         ),
         transitionsBuilder: (context, animation, secondaryAnimation, child) {
           final fadeAnimation = CurvedAnimation(parent: animation, curve: Curves.easeOut);
-          final slideAnimation = Tween<Offset>(
-            begin: const Offset(0.0, 0.2),
-            end: Offset.zero,
-          ).animate(fadeAnimation);
           return FadeTransition(
             opacity: fadeAnimation,
             child: SlideTransition(
-              position: slideAnimation,
+              position: Tween<Offset>(begin: const Offset(0.0, 0.2), end: Offset.zero).animate(fadeAnimation),
               child: child,
             ),
           );
@@ -60,7 +65,7 @@ class MovieCard extends StatelessWidget {
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
       constraints: const BoxConstraints(maxWidth: 600),
-      builder: (context) => MovieDetailsSheet(movie: movie, onPlay: () => _playMovie(context)),
+      builder: (context) => MovieDetailsSheet(movie: widget.movie, onPlay: () => _playMovie(context)),
     );
   }
 
@@ -68,61 +73,93 @@ class MovieCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
     final isPad = screenWidth > 600;
-    
-    final baseWidth = isLarge ? 140.0 : 110.0;
-    
+    final baseWidth = widget.isLarge ? 140.0 : 110.0;
     final width = isPad ? baseWidth * 1.3 : baseWidth;
+    final cardHeight = (widget.isLarge ? 210.0 : 165.0) * (isPad ? 1.3 : 1.0);
 
     return GestureDetector(
       onTap: () => _showDetails(context),
-      child: Container(
-        width: width,
+      onPanUpdate: (details) {
+        setState(() {
+          _rotateY = ((details.localPosition.dx / width) - 0.5) * 0.22;
+          _rotateX = -(((details.localPosition.dy / cardHeight) - 0.5) * 0.22);
+          _scale = 1.06;
+        });
+      },
+      onPanEnd: (_) {
+        setState(() {
+          _rotateX = 0;
+          _rotateY = 0;
+          _scale = 1.0;
+        });
+      },
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.easeOutCubic,
+        transform: Matrix4.identity()
+          ..setEntry(3, 2, 0.001)
+          ..rotateX(_rotateX)
+          ..rotateY(_rotateY)
+          ..scale(_scale),
+        transformAlignment: Alignment.center,
         margin: const EdgeInsets.symmetric(horizontal: 4),
+        width: width,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Expanded(
-              child: Container(
-                width: width,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(8),
-                  color: const Color(0xFF161616), // Artory Card
-                ),
-                clipBehavior: Clip.antiAlias,
-                child: movie.posterUrl.isNotEmpty
-                    ? CachedNetworkImage(
-                        imageUrl: movie.posterUrl,
-                        fit: BoxFit.cover,
-                        placeholder: (context, url) => Container(
-                          color: const Color(0xFF161616),
-                          child: const Center(
-                            child: CircularProgressIndicator(color: Color(0xFFE50914), strokeWidth: 2),
-                          ),
-                        ),
-                        errorWidget: (context, url, error) => 
-                            const Center(child: Icon(Icons.movie, color: Colors.white24)),
-                      )
-                    : const Center(child: Icon(Icons.movie, color: Colors.white24)),
+            Container(
+              width: width,
+              height: cardHeight,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(10),
+                color: const Color(0xFF161616),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(_scale > 1.0 ? 0.55 : 0.25),
+                    blurRadius: _scale > 1.0 ? 22 : 8,
+                    offset: const Offset(0, 5),
+                  ),
+                ],
               ),
+              clipBehavior: Clip.antiAlias,
+              child: widget.movie.posterUrl.isNotEmpty
+                  ? CachedNetworkImage(
+                      imageUrl: widget.movie.posterUrl,
+                      fit: BoxFit.cover,
+                      placeholder: (context, url) => Container(
+                        color: const Color(0xFF161616),
+                        child: const Center(
+                          child: CircularProgressIndicator(color: Color(0xFFE50914), strokeWidth: 2),
+                        ),
+                      ),
+                      errorWidget: (context, url, error) =>
+                          const Center(child: Icon(Icons.movie, color: Colors.white24)),
+                    )
+                  : const Center(child: Icon(Icons.movie, color: Colors.white24)),
             ),
             const SizedBox(height: 6),
-            Text(
-              movie.title,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              textAlign: TextAlign.center,
-              style: GoogleFonts.inter(
-                color: Colors.white.withOpacity(0.7),
-                fontSize: 11,
-                fontWeight: FontWeight.w500,
+            SizedBox(
+              width: width,
+              child: Text(
+                widget.movie.title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: GoogleFonts.inter(
+                  color: Colors.white.withOpacity(0.75),
+                  fontSize: 11,
+                  fontWeight: FontWeight.w500,
+                ),
               ),
             ),
           ],
         ),
-      ).animate().fade(delay: (index * 50).ms, duration: 400.ms).slideX(begin: 0.1),
+      ).animate().fade(delay: (widget.index * 50).ms, duration: 400.ms).slideX(begin: 0.1),
     );
   }
 }
+
 
 class MovieDetailsSheet extends ConsumerStatefulWidget {
   final TmdbMovie movie;

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:shimmer/shimmer.dart';
 import '../models/tmdb_movie.dart';
 import 'movie_card.dart';
 
@@ -8,6 +9,7 @@ class Carousel extends StatelessWidget {
   final String? badge;
   final List<TmdbMovie> movies;
   final bool isLarge;
+  final bool isLoading;
 
   const Carousel({
     super.key,
@@ -15,11 +17,16 @@ class Carousel extends StatelessWidget {
     this.badge,
     required this.movies,
     this.isLarge = false,
+    this.isLoading = false,
   });
 
   @override
   Widget build(BuildContext context) {
-    if (movies.isEmpty) return const SizedBox.shrink();
+    if (!isLoading && movies.isEmpty) return const SizedBox.shrink();
+
+    if (isLoading) {
+      return _buildShimmer(context);
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -82,6 +89,55 @@ class Carousel extends StatelessWidget {
                 isLarge: isLarge,
               );
             },
+          ),
+        ),
+        const SizedBox(height: 25),
+      ],
+    );
+  }
+
+  Widget _buildShimmer(BuildContext context) {
+    final isPad = MediaQuery.of(context).size.width > 600;
+    final cardWidth = (isLarge ? 140.0 : 110.0) * (isPad ? 1.3 : 1.0);
+    final cardHeight = (isLarge ? 210.0 : 165.0) * (isPad ? 1.3 : 1.0);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+          child: Shimmer.fromColors(
+            baseColor: Colors.white10,
+            highlightColor: Colors.white24,
+            child: Container(
+              width: 120, height: 18,
+              decoration: BoxDecoration(
+                color: Colors.white10,
+                borderRadius: BorderRadius.circular(4),
+              ),
+            ),
+          ),
+        ),
+        SizedBox(
+          height: cardHeight + 45,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            physics: const NeverScrollableScrollPhysics(),
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            itemCount: 6,
+            itemBuilder: (context, index) => Shimmer.fromColors(
+              baseColor: const Color(0xFF1A1A1A),
+              highlightColor: const Color(0xFF2A2A2A),
+              child: Container(
+                width: cardWidth,
+                height: cardHeight,
+                margin: const EdgeInsets.symmetric(horizontal: 4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1A1A1A),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+            ),
           ),
         ),
         const SizedBox(height: 25),
