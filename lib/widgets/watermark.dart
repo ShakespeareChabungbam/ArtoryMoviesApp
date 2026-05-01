@@ -8,38 +8,33 @@ class WatermarkFooter extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 40),
-      child: Column(
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(
-                Icons.apple,
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Text(
+              'ArtoryMovies',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.inter(
                 color: Colors.white38,
-                size: 20,
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                letterSpacing: -0.5,
               ),
-              const SizedBox(width: 8),
-              Text(
-                'ArtoryMovies',
-                style: GoogleFonts.inter(
-                  color: Colors.white38,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: -0.5,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Developed by shakespeare Chabungbam',
-            style: GoogleFonts.inter(
-              color: Colors.white24,
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
             ),
-          ),
-        ],
+            const SizedBox(height: 8),
+            Text(
+              'Developed by Shakespeare Chabungbam',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.inter(
+                color: Colors.white24,
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

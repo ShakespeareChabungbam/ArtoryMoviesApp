@@ -205,7 +205,7 @@ class _SearchScreenState extends State<SearchScreen> {
                                     ),
                                   ),
                                   const WatermarkFooter(),
-                                  const SizedBox(height: 100), // padding for bottom nav
+                                  SizedBox(height: 56 + MediaQuery.of(context).viewPadding.bottom + 20), // padding for bottom nav
                                 ],
                               ),
                             )
@@ -233,8 +233,8 @@ class _SearchScreenState extends State<SearchScreen> {
                             const SliverToBoxAdapter(
                               child: WatermarkFooter(),
                             ),
-                            const SliverToBoxAdapter(
-                              child: SizedBox(height: 100), // padding for bottom nav
+                            SliverToBoxAdapter(
+                              child: SizedBox(height: 56 + MediaQuery.of(context).viewPadding.bottom + 20), // padding for bottom nav
                             ),
                           ],
                         ),

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -33,7 +34,12 @@ class _HomeScreenState extends State<HomeScreen> {
   List<TmdbMovie> _sciFiSeries = [];
   List<TmdbMovie> _crimeSeries = [];
   bool _isLoading = true;
-  bool _hasError = false;
+  String? _errorMessage;
+
+  // Hero carousel
+  final PageController _heroPageController = PageController();
+  Timer? _heroTimer;
+  int _heroPage = 0;
 
   @override
   void initState() {
@@ -46,52 +52,71 @@ class _HomeScreenState extends State<HomeScreen> {
     _loadData();
   }
 
+  void _startHeroTimer() {
+    _heroTimer?.cancel();
+    _heroTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+      if (!mounted || _trending.isEmpty) return;
+      final next = (_heroPage + 1) % _trending.take(5).length;
+      _heroPageController.animateToPage(
+        next,
+        duration: const Duration(milliseconds: 800),
+        curve: Curves.easeInOutCubic,
+      );
+    });
+  }
+
   Future<void> _loadData() async {
     setState(() {
       _isLoading = true;
-      _hasError = false;
+      _errorMessage = null;
     });
 
-    final results = await Future.wait([
-      TmdbService.getTrending(),
-      TmdbService.getAction(),
-      TmdbService.getDrama(),
-      TmdbService.getSciFi(),
-      TmdbService.getHorror(),
-      TmdbService.getComedy(),
-      TmdbService.getPopularSeries(),
-      TmdbService.getActionSeries(),
-      TmdbService.getSciFiSeries(),
-      TmdbService.getCrimeSeries(),
-    ]);
+    Future<List<TmdbMovie>> safe(Future<List<TmdbMovie>> f) async {
+      try { return await f; } catch (_) { return []; }
+    }
 
-    if (mounted) {
-      // If the first crucial result (trending) is empty, consider it a network error
-      if (results[0].isEmpty) {
-        setState(() {
-          _isLoading = false;
-          _hasError = true;
-        });
-      } else {
-        setState(() {
-          _trending = results[0];
-          _action = results[1];
-          _drama = results[2];
-          _sciFi = results[3];
-          _horror = results[4];
-          _comedy = results[5];
-          _popularSeries = results[6];
-          _actionSeries = results[7];
-          _sciFiSeries = results[8];
-          _crimeSeries = results[9];
-          _isLoading = false;
-        });
-      }
+    // Load trending first - if this fails, show error
+    final trending = await safe(TmdbService.getTrending());
+    if (!mounted) return;
+
+    if (trending.isEmpty) {
+      setState(() {
+        _isLoading = false;
+        _errorMessage = 'Could not connect to movie database.\nPlease check your internet and retry.';
+      });
+      return;
+    }
+
+    // Trending loaded — show page immediately, load rest in background
+    setState(() {
+      _trending = trending;
+      _isLoading = false;
+    });
+    _startHeroTimer();
+
+    // Load remaining categories one by one with small delays
+    final categories = [
+      () async { final r = await safe(TmdbService.getAction()); if (mounted) setState(() => _action = r); },
+      () async { final r = await safe(TmdbService.getDrama()); if (mounted) setState(() => _drama = r); },
+      () async { final r = await safe(TmdbService.getSciFi()); if (mounted) setState(() => _sciFi = r); },
+      () async { final r = await safe(TmdbService.getHorror()); if (mounted) setState(() => _horror = r); },
+      () async { final r = await safe(TmdbService.getComedy()); if (mounted) setState(() => _comedy = r); },
+      () async { final r = await safe(TmdbService.getPopularSeries()); if (mounted) setState(() => _popularSeries = r); },
+      () async { final r = await safe(TmdbService.getActionSeries()); if (mounted) setState(() => _actionSeries = r); },
+      () async { final r = await safe(TmdbService.getSciFiSeries()); if (mounted) setState(() => _sciFiSeries = r); },
+      () async { final r = await safe(TmdbService.getCrimeSeries()); if (mounted) setState(() => _crimeSeries = r); },
+    ];
+
+    for (final load in categories) {
+      await load();
+      await Future.delayed(const Duration(milliseconds: 200));
     }
   }
 
   @override
   void dispose() {
+    _heroTimer?.cancel();
+    _heroPageController.dispose();
     _scrollController.dispose();
     super.dispose();
   }
@@ -107,7 +132,7 @@ class _HomeScreenState extends State<HomeScreen> {
       );
     }
 
-    if (_hasError) {
+    if (_errorMessage != null) {
       return Scaffold(
         backgroundColor: Colors.black,
         body: Center(
@@ -115,7 +140,7 @@ class _HomeScreenState extends State<HomeScreen> {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Text(
-                'Failed to load content.',
+                _errorMessage!,
                 style: GoogleFonts.inter(color: Colors.white54, fontSize: 16),
               ),
               const SizedBox(height: 16),
@@ -139,7 +164,7 @@ class _HomeScreenState extends State<HomeScreen> {
       );
     }
 
-    final TmdbMovie? heroMovie = _trending.isNotEmpty ? _trending.first : null;
+    final heroMovies = _trending.take(5).toList();
 
     return Scaffold(
       backgroundColor: Colors.black,
@@ -149,12 +174,50 @@ class _HomeScreenState extends State<HomeScreen> {
             controller: _scrollController,
             physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
             slivers: [
-              // Hero Banner
+              // Hero Carousel
               SliverToBoxAdapter(
-                child: heroMovie != null ? _buildHero(heroMovie) : const SizedBox.shrink(),
+                child: heroMovies.isNotEmpty
+                    ? Stack(
+                        children: [
+                          SizedBox(
+                            height: MediaQuery.of(context).size.height * 0.65,
+                            child: PageView.builder(
+                              controller: _heroPageController,
+                              itemCount: heroMovies.length,
+                              onPageChanged: (page) => setState(() => _heroPage = page),
+                              itemBuilder: (context, index) => _buildHero(heroMovies[index]),
+                            ),
+                          ),
+                          // Dot indicators
+                          Positioned(
+                            bottom: 16,
+                            left: 0,
+                            right: 0,
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: List.generate(heroMovies.length, (i) {
+                                final isActive = i == _heroPage;
+                                return AnimatedContainer(
+                                  duration: const Duration(milliseconds: 300),
+                                  curve: Curves.easeOutCubic,
+                                  margin: const EdgeInsets.symmetric(horizontal: 3),
+                                  width: isActive ? 20 : 6,
+                                  height: 6,
+                                  decoration: BoxDecoration(
+                                    color: isActive ? const Color(0xFFE50914) : Colors.white38,
+                                    borderRadius: BorderRadius.circular(3),
+                                  ),
+                                );
+                              }),
+                            ),
+                          ),
+                        ],
+                      )
+                    : const SizedBox.shrink(),
               ),
-              
+
               const SliverToBoxAdapter(child: SizedBox(height: 10)),
+
               
               // Genre Quick Select
               SliverToBoxAdapter(
@@ -219,7 +282,9 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: WatermarkFooter(),
               ),
 
-              const SliverToBoxAdapter(child: SizedBox(height: 100)),
+              SliverToBoxAdapter(
+                child: SizedBox(height: 56 + MediaQuery.of(context).viewPadding.bottom + 20),
+              ),
             ],
           ),
 
@@ -232,48 +297,40 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildNavbar() {
     final double opacity = (_scrollOffset / 200).clamp(0.0, 1.0);
-
     return Positioned(
-      top: 0,
-      left: 0,
-      right: 0,
+      top: 0, left: 0, right: 0,
       child: Container(
         padding: EdgeInsets.only(
           top: MediaQuery.of(context).padding.top + 10,
-          bottom: 15,
-          left: 20,
-          right: 20,
+          bottom: 15, left: 20, right: 20,
         ),
         decoration: BoxDecoration(
           color: Colors.black.withOpacity(opacity),
-          gradient: opacity < 1.0 
+          gradient: opacity < 1.0
               ? LinearGradient(
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
-                  colors: [
-                    Colors.black.withOpacity(0.9),
-                    Colors.transparent,
-                  ],
+                  colors: [Colors.black.withOpacity(0.85), Colors.transparent],
                 )
               : null,
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.baseline,
+          textBaseline: TextBaseline.alphabetic,
           children: [
             Text(
               'ARTORY',
               style: GoogleFonts.bebasNeue(
-                color: Colors.white,
-                fontSize: 28,
-                letterSpacing: 2,
+                color: Colors.white, fontSize: 28, letterSpacing: 2,
               ),
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: 6),
             Text(
               'MOVIES',
               style: GoogleFonts.inter(
                 color: const Color(0xFFE50914),
-                fontSize: 10,
+                fontSize: 11,
                 fontWeight: FontWeight.w900,
                 letterSpacing: 2.5,
               ),
@@ -285,130 +342,152 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildHero(TmdbMovie movie) {
-    return SizedBox(
-      height: MediaQuery.of(context).size.height * 0.65,
-      width: double.infinity,
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          // Background Parallax
-          Positioned(
-            top: -_scrollOffset * 0.5,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            child: CachedNetworkImage(
-              imageUrl: movie.posterUrl,
-              fit: BoxFit.cover,
-              placeholder: (context, url) => Container(color: const Color(0xFF161616)),
-              errorWidget: (context, url, error) => Container(color: const Color(0xFF161616)),
-            ),
-          ),
+    final heroHeight = MediaQuery.of(context).size.height * 0.65;
+    final parallaxOffset = (_scrollOffset * 0.35).clamp(0.0, 80.0);
 
-          // Fade gradient
-          Positioned(
-            bottom: 0,
-            left: 0,
-            right: 0,
-            height: 300,
-            child: Container(
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    Colors.transparent,
-                    Colors.black,
-                  ],
+    return SizedBox(
+      height: heroHeight,
+      width: double.infinity,
+      child: ClipRect(
+        child: Stack(
+          children: [
+            // Parallax background — taller than container so it has room to move
+            Positioned(
+              top: -parallaxOffset,
+              left: 0, right: 0,
+              height: heroHeight + 90,
+              child: CachedNetworkImage(
+                imageUrl: movie.posterUrl,
+                fit: BoxFit.cover,
+                placeholder: (context, url) => Container(color: const Color(0xFF161616)),
+                errorWidget: (context, url, error) => Container(color: const Color(0xFF161616)),
+              ),
+            ),
+
+            // Top gradient (for navbar readability)
+            Positioned(
+              top: 0, left: 0, right: 0,
+              height: 160,
+              child: Container(
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [Colors.black87, Colors.transparent],
+                  ),
                 ),
               ),
             ),
-          ),
 
-          // Content
-          Positioned(
-            bottom: 20,
-            left: 20,
-            right: 20,
-            child: Column(
-              children: [
-                Text(
-                  movie.title,
-                  textAlign: TextAlign.center,
-                  style: GoogleFonts.inter(
-                    color: Colors.white,
-                    fontSize: 42,
-                    fontWeight: FontWeight.w900,
-                    height: 1.1,
-                    letterSpacing: -1,
+            // Bottom gradient
+            Positioned(
+              bottom: 0, left: 0, right: 0,
+              height: 320,
+              child: Container(
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [Colors.transparent, Colors.black],
                   ),
-                ).animate().fade(duration: 800.ms).slideY(begin: 0.2),
-                
-                const SizedBox(height: 25),
+                ),
+              ),
+            ),
 
-                // Play Button
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    GestureDetector(
-                      onTap: () {
-                        HapticFeedback.lightImpact();
-                        Navigator.push(
-                          context,
-                          PageRouteBuilder(
-                            pageBuilder: (context, animation, secondaryAnimation) => VideoPlayerScreen(
-                              movieId: movie.id,
-                              movieTitle: movie.title,
-                              isTvShow: movie.isTvShow,
-                            ),
-                            transitionsBuilder: (context, animation, secondaryAnimation, child) {
-                              final fadeAnimation = CurvedAnimation(parent: animation, curve: Curves.easeOut);
-                              final slideAnimation = Tween<Offset>(
-                                begin: const Offset(0.0, 0.2),
-                                end: Offset.zero,
-                              ).animate(fadeAnimation);
-                              return FadeTransition(
-                                opacity: fadeAnimation,
-                                child: SlideTransition(
-                                  position: slideAnimation,
-                                  child: child,
-                                ),
-                              );
-                            },
+            // Hero content — left-aligned, Apple TV style
+            Positioned(
+              bottom: 24,
+              left: 20, right: 20,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    movie.title,
+                    textAlign: TextAlign.left,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.inter(
+                      color: Colors.white,
+                      fontSize: 36,
+                      fontWeight: FontWeight.w900,
+                      height: 1.1,
+                      letterSpacing: -0.5,
+                    ),
+                  ).animate().fade(duration: 800.ms).slideY(begin: 0.15),
+
+                  const SizedBox(height: 8),
+
+                  Text(
+                    movie.isTvShow ? 'TV Series' : 'Movie',
+                    style: GoogleFonts.inter(
+                      color: Colors.white54,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ).animate().fade(delay: 100.ms, duration: 600.ms),
+
+                  const SizedBox(height: 20),
+
+                  GestureDetector(
+                    onTap: () {
+                      HapticFeedback.lightImpact();
+                      Navigator.push(
+                        context,
+                        PageRouteBuilder(
+                          pageBuilder: (context, animation, secondaryAnimation) => VideoPlayerScreen(
+                            movieId: movie.id,
+                            movieTitle: movie.title,
+                            isTvShow: movie.isTvShow,
                           ),
-                        );
-                      },
-                      child: Container(
-                        width: MediaQuery.of(context).size.width * 0.8,
-                        height: 50,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFE50914), // Artory Red
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Icon(Icons.play_arrow, color: Colors.white, size: 28),
-                            const SizedBox(width: 5),
-                            Text(
-                              'WATCH NOW',
-                              style: GoogleFonts.inter(
-                                color: Colors.white,
-                                fontSize: 16,
-                                fontWeight: FontWeight.w800,
-                                letterSpacing: 1.5,
+                          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+                            final fade = CurvedAnimation(parent: animation, curve: Curves.easeOut);
+                            return FadeTransition(
+                              opacity: fade,
+                              child: SlideTransition(
+                                position: Tween<Offset>(begin: const Offset(0, 0.15), end: Offset.zero).animate(fade),
+                                child: child,
                               ),
-                            ),
-                          ],
+                            );
+                          },
                         ),
+                      );
+                    },
+                    child: Container(
+                      width: double.infinity,
+                      height: 50,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE50914),
+                        borderRadius: BorderRadius.circular(10),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFFE50914).withOpacity(0.4),
+                            blurRadius: 20, offset: const Offset(0, 6),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.play_arrow_rounded, color: Colors.white, size: 26),
+                          const SizedBox(width: 6),
+                          Text(
+                            'WATCH NOW',
+                            style: GoogleFonts.inter(
+                              color: Colors.white,
+                              fontSize: 15,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 1.2,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                  ],
-                ).animate().fade(delay: 200.ms).slideY(begin: 0.2),
-              ],
+                  ).animate().fade(delay: 200.ms).slideY(begin: 0.15),
+                ],
+              ),
             ),
-          )
-        ],
+          ],
+        ),
       ),
     );
   }

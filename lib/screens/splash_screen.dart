@@ -99,7 +99,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
           
           // Bottom Attribution
           Positioned(
-            bottom: 50,
+            bottom: MediaQuery.of(context).viewPadding.bottom + 30,
             left: 0,
             right: 0,
             child: AnimatedBuilder(

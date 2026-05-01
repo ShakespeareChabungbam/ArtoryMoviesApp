@@ -76,8 +76,12 @@ class CategoryScreen extends StatelessWidget {
           const SliverToBoxAdapter(
             child: WatermarkFooter(),
           ),
-          const SliverToBoxAdapter(
-            child: SizedBox(height: 100), // padding for bottom nav
+          SliverToBoxAdapter(
+            child: Builder(
+              builder: (ctx) => SizedBox(
+                height: 56 + MediaQuery.of(ctx).viewPadding.bottom + 20,
+              ),
+            ),
           )
         ],
       ),
