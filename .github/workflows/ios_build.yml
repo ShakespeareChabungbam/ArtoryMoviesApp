@@ -1,0 +1,71 @@
+name: Build iOS IPA
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build iOS Release
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build IPA (Unsigned)
+        run: flutter build ipa --release --no-codesign
+
+      - name: Rename IPA
+        run: |
+          VERSION=$(grep 'version:' pubspec.yaml | head -1 | awk '{print $2}')
+          SHA=$(echo "${{ github.sha }}" | cut -c1-7)
+          mkdir -p build/ios/ipa_release
+          mv build/ios/ipa/*.ipa build/ios/ipa_release/ArtoryMovies-v${VERSION}-${SHA}.ipa
+          echo "IPA_NAME=ArtoryMovies-v${VERSION}-${SHA}.ipa" >> $GITHUB_ENV
+          echo "IPA_PATH=build/ios/ipa_release/ArtoryMovies-v${VERSION}-${SHA}.ipa" >> $GITHUB_ENV
+
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.IPA_NAME }}
+          path: ${{ env.IPA_PATH }}
+          retention-days: 30
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: build-ios-${{ github.run_number }}
+          name: "ArtoryMovies iOS Build #${{ github.run_number }}"
+          body: |
+            ## 🍎 ArtoryMovies iOS IPA (Unsigned)
+
+            **Commit:** `${{ github.sha }}`
+            **Built at:** ${{ github.event.head_commit.timestamp }}
+
+            ### Note on Installation
+            This is an **unsigned** IPA. To install it on your iPhone:
+            1. Use **Sideloadly**, **AltStore**, or **Xcode** to sign it with your Apple ID.
+            2. Or sign it via the Apple Developer portal if you have a paid account.
+
+            > Built automatically by GitHub Actions
+          files: ${{ env.IPA_PATH }}
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

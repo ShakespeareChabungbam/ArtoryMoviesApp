@@ -8,6 +8,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import '../models/tmdb_movie.dart';
 import '../services/tmdb_service.dart';
 import '../widgets/carousel.dart';
+import '../widgets/continue_watching_carousel.dart';
 import '../widgets/watermark.dart';
 import 'video_player_screen.dart';
 
@@ -218,7 +219,11 @@ class _HomeScreenState extends State<HomeScreen> {
 
               const SliverToBoxAdapter(child: SizedBox(height: 10)),
 
-              
+              // Continue Watching (persisted history)
+              const SliverToBoxAdapter(
+                child: ContinueWatchingCarousel(),
+              ),
+
               // Genre Quick Select
               SliverToBoxAdapter(
                 child: _buildGenrePills()
@@ -438,6 +443,10 @@ class _HomeScreenState extends State<HomeScreen> {
                             movieId: movie.id,
                             movieTitle: movie.title,
                             isTvShow: movie.isTvShow,
+                            posterPath: movie.posterPath,
+                            backdropPath: movie.backdropPath,
+                            voteAverage: movie.voteAverage,
+                            overview: movie.overview,
                           ),
                           transitionsBuilder: (context, animation, secondaryAnimation, child) {
                             final fade = CurvedAnimation(parent: animation, curve: Curves.easeOut);

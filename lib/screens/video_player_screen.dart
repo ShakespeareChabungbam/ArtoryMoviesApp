@@ -2,29 +2,40 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../models/tmdb_movie.dart';
+import '../providers/watch_history_provider.dart';
 
-class VideoPlayerScreen extends StatefulWidget {
+class VideoPlayerScreen extends ConsumerStatefulWidget {
   final int movieId;
   final String movieTitle;
   final bool isTvShow;
   final int? seasonNumber;
   final int? episodeNumber;
+  final String? posterPath;
+  final String? backdropPath;
+  final double voteAverage;
+  final String overview;
 
   const VideoPlayerScreen({
-    super.key, 
+    super.key,
     required this.movieId,
     required this.movieTitle,
     this.isTvShow = false,
     this.seasonNumber,
     this.episodeNumber,
+    this.posterPath,
+    this.backdropPath,
+    this.voteAverage = 0.0,
+    this.overview = '',
   });
 
   @override
-  State<VideoPlayerScreen> createState() => _VideoPlayerScreenState();
+  ConsumerState<VideoPlayerScreen> createState() => _VideoPlayerScreenState();
 }
 
-class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
+class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
   InAppWebViewController? webViewController;
   bool isLoading = true;
   bool showOverlay = true;
@@ -41,12 +52,26 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
       DeviceOrientation.landscapeLeft,
     ]);
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
-    
+
     _updateClock();
     _startOverlayTimer();
-    
+
     clockTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
       _updateClock();
+    });
+
+    // Save to watch history
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final movie = TmdbMovie(
+        id: widget.movieId,
+        title: widget.movieTitle,
+        posterPath: widget.posterPath,
+        backdropPath: widget.backdropPath,
+        voteAverage: widget.voteAverage,
+        overview: widget.overview,
+        isTvShow: widget.isTvShow,
+      );
+      ref.read(watchHistoryProvider.notifier).addToHistory(movie);
     });
   }
 

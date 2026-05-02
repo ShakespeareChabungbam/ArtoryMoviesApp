@@ -43,6 +43,10 @@ class _MovieCardState extends State<MovieCard> {
           movieId: widget.movie.id,
           movieTitle: widget.movie.title,
           isTvShow: widget.movie.isTvShow,
+          posterPath: widget.movie.posterPath,
+          backdropPath: widget.movie.backdropPath,
+          voteAverage: widget.movie.voteAverage,
+          overview: widget.movie.overview,
         ),
         transitionsBuilder: (context, animation, secondaryAnimation, child) {
           final fadeAnimation = CurvedAnimation(parent: animation, curve: Curves.easeOut);
@@ -273,6 +277,10 @@ class _MovieDetailsSheetState extends ConsumerState<MovieDetailsSheet> {
           isTvShow: true,
           seasonNumber: seasonNumber,
           episodeNumber: episodeNumber,
+          posterPath: widget.movie.posterPath,
+          backdropPath: widget.movie.backdropPath,
+          voteAverage: widget.movie.voteAverage,
+          overview: widget.movie.overview,
         ),
         transitionsBuilder: (context, animation, secondaryAnimation, child) {
           final fadeAnimation = CurvedAnimation(parent: animation, curve: Curves.easeOut);
