@@ -116,7 +116,7 @@ class _GlassNavBar extends StatelessWidget {
   Widget build(BuildContext context) {
     // Use viewPadding (not padding) because extendBody=true causes padding.bottom to be 0
     final bottomPad = MediaQuery.of(context).viewPadding.bottom;
-    final navContentHeight = 56.0;
+    final navContentHeight = 58.0;
     return ClipRect(
       child: BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
@@ -144,7 +144,7 @@ class _GlassNavBar extends StatelessWidget {
                       child: AnimatedContainer(
                         duration: const Duration(milliseconds: 300),
                         curve: Curves.easeOutCubic,
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 5),
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 3),
                         decoration: BoxDecoration(
                           color: isActive ? Colors.white.withOpacity(0.1) : Colors.transparent,
                           borderRadius: BorderRadius.circular(16),

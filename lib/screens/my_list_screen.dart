@@ -120,7 +120,7 @@ class MyListScreen extends ConsumerWidget {
             ),
             const SliverToBoxAdapter(child: WatermarkFooter()),
             SliverToBoxAdapter(
-              child: SizedBox(height: 56 + MediaQuery.of(context).viewPadding.bottom + 20),
+              child: SizedBox(height: 58 + MediaQuery.of(context).viewPadding.bottom + 20),
             ),
           ],
         ],

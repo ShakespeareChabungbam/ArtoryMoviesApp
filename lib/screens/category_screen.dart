@@ -79,7 +79,7 @@ class CategoryScreen extends StatelessWidget {
           SliverToBoxAdapter(
             child: Builder(
               builder: (ctx) => SizedBox(
-                height: 56 + MediaQuery.of(ctx).viewPadding.bottom + 20,
+                height: 58 + MediaQuery.of(ctx).viewPadding.bottom + 20,
               ),
             ),
           )
